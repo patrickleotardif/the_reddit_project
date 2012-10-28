@@ -5,6 +5,7 @@ import pymongo
 from datetime import datetime
 import calendar
 
+SUBREDDIT = 'travel'
 
 #assumes existence of a mongodb connection on the standard port
 from pymongo import Connection
@@ -33,8 +34,7 @@ def insertBootstrapPage(json_data,position_reference) :
 		                                'down' : item['data']['downs'],
 		                                'com' :  item['data']['num_comments'],
 		                                'pos' : (json_data.index(item) 
-		                                        + 1 
-		                                        + position_reference)
+		                                        + 1 + position_reference)
 		                              }}]
 		item['data']['_id'] = item['data']['id'] #mongo uses '_id'
 		del item['data']['id'] 
@@ -44,17 +44,54 @@ def insertBootstrapPage(json_data,position_reference) :
 def initialBootstrap(numPages) :
 	for i in range(0,numPages):
 		if i == 0:
-			url = 'http://www.reddit.com/r/travel/.json?limit=100'
+			url = 'http://www.reddit.com/r/' + SUBREDDIT + '/.json?limit=100'
 		else:
-			url = ('http://www.reddit.com/r/travel/.json?limit=100&' 
+			url = ('http://www.reddit.com/r/' + SUBREDDIT + '/.json?limit=100&' 
 			       + urllib.urlencode({'count':str(i*100),'after': page['after']}))
 		page = getPage(url)
 		insertBootstrapPage(page['children'],position_reference=i*100)
 
+def getNewPosts():
+	morePosts = True
+	newPosts = []
+	i = 0  #number of 100 post pages visited
+	after = None
+	while (morePosts) :	
+		if not after:
+			url = 'http://www.reddit.com/r/' + SUBREDDIT + '/new/.json?limit=100'
+		else:
+			url = ('http://www.reddit.com/r/' + SUBREDDIT + '/new/.json?limit=100&' 
+			       + urllib.urlencode({'count':str(i*100),'after': after}))
+		page = getPage(url)	
+		if len(page['children']) > 0:
+			for post in page['children']:
+				if collection.find({'_id':post['data']['id']}).count() > 0:
+					morePosts = False
+					break
+				else:
+					post['data']['_id'] = post['data']['id'] #mongo uses '_id'
+					del post['data']['id'] 
+					newPosts.append(post['data'])
+		if page['after'] :
+			after = page['after']
+			i+=1
+		else:
+			morePosts = False
+	if len(newPosts) > 0:
+		print str(newPosts)
+		collection.insert(newPosts)
+		print 'Added %i' % len(newPosts)
+	else :
+		print 'Nothing added'
+
+		
 
 def assignVariableData():
-	#do stuff
-	print 'lala'
+	# get all of the new pages
+	# get a set of everything that needs updated data
+	# go through front pages until it is all found
+	
+	print 'filler text'
 		
 def main() :
 	initialBootstrap(3) # x* 100 post length pages
