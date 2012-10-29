@@ -3,6 +3,7 @@ import urllib
 import json
 import pymongo
 from datetime import datetime
+import time
 import calendar
 
 SUBREDDIT = 'travel'
@@ -10,13 +11,13 @@ SUBREDDIT = 'travel'
 #assumes existence of a mongodb connection on the standard port
 from pymongo import Connection
 connection = Connection()
-db = connection.test_database
-collection = db.test_collection
+db = connection.reddit
+collection = db.travel
 
 def getPage(url) :
 	opener = urllib2.build_opener()
 	opener.addheaders = [('User-agent', 
-	                      'pltardif scraper for the_reddit_project')]
+	                      '/u/pltardif awesome scraper for the_reddit_project')]
 	r = opener.open(url)
 	json_data = json.loads(r.read().strip())
 	return json_data['data']	
@@ -27,8 +28,9 @@ def now():
 	
 def insertBootstrapPage(json_data,position_reference) :
 	posts = []
+	base_time = now()
 	for item in json_data:
-		item['data']['var'] = [{'time':now(),
+		item['data']['var'] = [{'time': base_time,
 		                              'data':{
 		                                'up' :   item['data']['ups'],
 		                                'down' : item['data']['downs'],
@@ -79,22 +81,65 @@ def getNewPosts():
 			morePosts = False
 	if len(newPosts) > 0:
 		print str(newPosts)
-		collection.insert(newPosts)
+		collection.insert(newPosts) #bulk insert
 		print 'Added %i' % len(newPosts)
 	else :
 		print 'Nothing added'
 
-		
+def getAllIds():
+	ids = set()
+	for id in collection.find():
+		ids.add(id['_id'])
+	return ids
 
 def assignVariableData():
-	# get all of the new pages
-	# get a set of everything that needs updated data
-	# go through front pages until it is all found
+	getNewPosts()
+	ids = getAllIds()
+	base_time = now()
+	finished = False
+	i = 0  #number of 100 post pages visited
+	after = None
+	while not (finished) :	
+		if not after:
+			url = 'http://www.reddit.com/r/' + SUBREDDIT + '/.json?limit=100'
+		else:
+			url = ('http://www.reddit.com/r/' + SUBREDDIT + '/.json?limit=100&' 
+			       + urllib.urlencode({'count':str(i*100),'after': after}))
+		page = getPage(url)
+		for post in page['children']:
+			if collection.find({'_id':post['data']['id']}).count() > 0:
+				ids.remove(post['data']['id'])
+				collection.update({'_id':post['data']['id']},
+					              { '$push' :{'var': 
+					                        {'time':base_time,
+					                         'data':{
+					                           'up' :   post['data']['ups'],
+					                           'down' : post['data']['downs'],
+					                           'com' :  post['data']['num_comments'],
+					                           'pos' : (page['children'].index(post) 
+					                                      + 1 + i*100)}}}})
+		if len(ids) == 0:
+			finished = True
+		else:
+			if page['after'] :
+				after = page['after']
+				print('Page %i processed' % (i + 1))
+				i+=1
+			else:
+				finished = True
+				#insert '?' for all remaining ids
+				for id in ids:
+					collection.update({'_id':id},{'$push':{'var':{'time':base_time,'data':'?'}}})
+				
+	print "Updated " + str(time.strftime("%d-%H:%M:%S", time.localtime()))
 	
-	print 'filler text'
-		
 def main() :
-	initialBootstrap(3) # x* 100 post length pages
+	initialBootstrap(5) # x* 100 post length pages
+	print('Bootstrapped')
+	while(True):
+		time.sleep(30)
+		assignVariableData()
+	
 
 
 if __name__ == "__main__":
