@@ -6,13 +6,17 @@ from datetime import datetime
 import time
 import calendar
 
+###############################
 SUBREDDIT = 'travel'
+SLEEPMINUTES = 3
+BOOTSTRAP_SIZE = 5
 
 #assumes existence of a mongodb connection on the standard port
 from pymongo import Connection
 connection = Connection()
 db = connection.reddit
 collection = db.travel
+###############################
 
 def getPage(url) :
 	opener = urllib2.build_opener()
@@ -123,7 +127,6 @@ def assignVariableData():
 		else:
 			if page['after'] :
 				after = page['after']
-				print('Page %i processed' % (i + 1))
 				i+=1
 			else:
 				finished = True
@@ -134,13 +137,11 @@ def assignVariableData():
 	print "Updated " + str(time.strftime("%d-%H:%M:%S", time.localtime()))
 	
 def main() :
-	initialBootstrap(5) # x* 100 post length pages
+	initialBootstrap(BOOTSTRAP_SIZE) # x* 100 post length pages
 	print('Bootstrapped')
 	while(True):
-		time.sleep(30)
+		time.sleep(SLEEPMINUTES*60)
 		assignVariableData()
-	
-
 
 if __name__ == "__main__":
     main()
