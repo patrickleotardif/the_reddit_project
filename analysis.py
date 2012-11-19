@@ -8,8 +8,6 @@ connection = Connection()
 db = connection.reddit
 
 collection = db.travel
-
-START_TIME = 1352938569
 #TRAVEL = 1352938569
 #FITNESS = 1352955347
 #####################
@@ -17,7 +15,7 @@ START_TIME = 1352938569
 parms = {'created_utc':{'$gte' : START_TIME}}
 parms2 = {'created_utc':START_TIME}
 
-def maxRankAchieved():	
+def maxRankAchieved(show=True):	
 	ranks = {}
 	for doc in collection.find(parms):
 		subparms  = {'_id':doc['_id']}
@@ -30,9 +28,10 @@ def maxRankAchieved():
 			else:
 				ranks[s] = [doc['_id']]
 	plt.plot(map(lambda x: len(ranks[x]),ranks))
-	plt.show()
+	if show : plt.show()
+	return ranks
 
-def completion_matrix():
+def completion_matrix(show=True):
 	#Get the time points to be used
 	m = collection.find_one(parms2,{'var.time'})['var']
 	new_m = []
@@ -61,8 +60,19 @@ def completion_matrix():
 			if p <= 100 : row[p-1] = 1
 		img.append(row)
 	plt.imshow(img)
-	plt.show()
+	if show: plt.show()
+	return m
 
-		
+def trajectory(id,show=True):
+	query = {'_id':id}
+	pos = []
+	for item in collection.find_one(query)['var']:
+		if item['data'] != '?' : pos.append(item['data']['pos'])
+	print pos
+	plt.plot(pos)
+	plt.ylim((1,100))
+	plt.xlim((0,50))
+	if show: plt.show()
+	return pos
 				
 		
