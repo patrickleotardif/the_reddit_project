@@ -67,7 +67,7 @@ def completion_matrix(show=True):
 		plt.show()
 	return m
 
-def topTrajectories():
+def topTrajectories(type='line'):
     #######################
 	r = [1,2,3,4,5,6]
 	rows = 3
@@ -79,13 +79,34 @@ def topTrajectories():
 	for i in r:
 		plt.subplot(rows*100 + columns*10 + c)
 		c += 1
-		for tr in ranks[i]:
-			trajectory(tr,False)
+		if type == 'line':
+			for tr in ranks[i]:
+				trajectory(tr,False)
+		elif type == 'box':
+			topTrajectoriesPerGroup(ranks[i],False)
+
 		plt.title('Max Rank = %s' % i)
 		plt.ylim((1,20))
 		plt.xlim((0,50))
 	plt.show()
 
+def topTrajectoriesPerGroup(ids,show=True):
+	data = []
+	for i in range(0,50): data.append([])
+	
+	for id in ids:
+		query = {'_id':id}
+		counter = 0
+		for item in collection.find_one(query)['var']:	
+			if counter == 50:
+				break
+			if item['data'] != '?':
+				data[counter].append(item['data']['pos'])
+			counter += 1
+	plt.boxplot(data)
+	if show:	plt.show()
+	return data
+	
 def trajectory(id,show=True):
 	query = {'_id':id}
 	pos = []
