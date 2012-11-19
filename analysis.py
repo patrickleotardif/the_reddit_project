@@ -27,8 +27,10 @@ def maxRankAchieved(show=True):
 				ranks[s].append(doc['_id'])
 			else:
 				ranks[s] = [doc['_id']]
-	plt.plot(map(lambda x: len(ranks[x]),ranks))
-	if show : plt.show()
+	
+	if show : 
+		plt.plot(map(lambda x: len(ranks[x]),ranks))
+		plt.show()
 	return ranks
 
 def completion_matrix(show=True):
@@ -59,16 +61,37 @@ def completion_matrix(show=True):
 		for p in item['pos']:
 			if p <= 100 : row[p-1] = 1
 		img.append(row)
-	plt.imshow(img)
-	if show: plt.show()
+	
+	if show: 
+		plt.imshow(img)
+		plt.show()
 	return m
+
+def topTrajectories():
+    #######################
+	r = [1,2,3,4,5,6]
+	rows = 3
+	columns = 2
+	#######################
+	
+	c = 1
+	ranks = maxRankAchieved(False)
+	for i in r:
+		plt.subplot(rows*100 + columns*10 + c)
+		c += 1
+		for tr in ranks[i]:
+			trajectory(tr,False)
+		plt.title('Max Rank = %s' % i)
+		plt.ylim((1,20))
+		plt.xlim((0,50))
+	plt.show()
 
 def trajectory(id,show=True):
 	query = {'_id':id}
 	pos = []
 	for item in collection.find_one(query)['var']:
 		if item['data'] != '?' : pos.append(item['data']['pos'])
-	print pos
+	
 	plt.plot(pos)
 	plt.ylim((1,100))
 	plt.xlim((0,50))
