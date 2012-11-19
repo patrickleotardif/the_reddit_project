@@ -1,0 +1,25 @@
+Data transfer instructions:
+
+#Connect to EC2, requires the proper key (new.pem) 
+#which you'll need to use (chmod 400 new.pem) on
+ssh -i new.pem ec2-user@ec2-184-72-146-181.compute-1.amazonaws.com
+
+#select the different sessions currently going on
+screen -r
+
+#export data to json
+mongo/bin/mongoexport --db reddit --collection travel --out travel.json
+mongo/bin/mongoexport --db reddit --collection fitness --out fitness.json
+
+#getting the data into your computer (run on local terminal)
+scp -i new.pem  ec2-user@ec2-184-72-146-181.compute-1.amazonaws.com:travel.json ../Dropbox/SYDE\ 461\ \&\ 462//data/travel.json 
+scp -i new.pem  ec2-user@ec2-184-72-146-181.compute-1.amazonaws.com:fitness.json ../Dropbox/SYDE\ 461\ \&\ 462//data/fitness.json 
+
+#run local mongod instance
+mongo/bin/mongod --dbpath data/db
+
+#putting into your local mongod instance
+../../../mongo/bin/mongoimport --db reddit --collection travel travel.json
+../../../mongo/bin/mongoimport --db reddit --collection fitness fitness.json
+
+
