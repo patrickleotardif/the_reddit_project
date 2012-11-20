@@ -49,5 +49,6 @@ def main() :
 	initialBootstrap(BOOTSTRAP_SIZE) 
 	print('Bootstrapped')
 
-main()
+if __name__ == "__main__":
+    main()
     
