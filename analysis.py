@@ -7,8 +7,9 @@ from pymongo import Connection
 connection = Connection()
 db = connection.reddit
 
+COLLECTION_NAME = 'fitness'
 collection = db.fitness
-START_TIME = 1352955347
+START_TIME = 0
 #TRAVEL = 1352938569
 #FITNESS = 1352955347
 #####################
@@ -16,23 +17,57 @@ START_TIME = 1352955347
 parms = {'created_utc':{'$gte' : START_TIME}}
 parms2 = {'created_utc':START_TIME}
 
-def maxRankAchieved(show=True):	
-	ranks = {}
+
+def distroReport():
+	c = 1	
+	for type in (('pos',None),('com',None),('up','loglog'),('down','loglog')):
+		plt.subplot(220 + c)
+		distro(type[0],type[1],False)
+		c += 1
+	plt.show()
+	
+	
+#options for type = up/down/com/pos
+def distro(type,plot=None,show=True):	
+	data = {}
+	
+	if type in ('up','down','com'):
+		INITIAL = 0
+		FUNC = 'max'
+	else: #pos
+		INITIAL = 5000
+		FUNC = 'min'
+		
 	for doc in collection.find(parms):
 		subparms  = {'_id':doc['_id']}
-		s = 5000 #or something else too big
+		s = INITIAL
 		for item in collection.find_one(subparms)['var']:
-			if item['data'] != '?' : s = min(s,item['data']['pos'])
-		if s : 
-			if s in ranks:
-				ranks[s].append(doc['_id'])
+			if item['data'] != '?' : 
+				if FUNC == 'max':
+					s = max(s,item['data'][type])
+				else : #min or pos
+					s = min(s,item['data'][type])
+		if s != INITIAL:
+			if s in data:
+				data[s].append(doc['_id'])
 			else:
-				ranks[s] = [doc['_id']]
+				data[s] = [doc['_id']]
 	
-	if show : 
-		plt.plot(map(lambda x: len(ranks[x]),ranks))
-		plt.show()
-	return ranks
+	if not plot:
+		plt.plot(map(lambda x: len(data[x]),data))
+	elif plot == 'loglog':
+		plt.loglog(map(lambda x: len(data[x]),data))
+	
+	if type in ('up','pos'):
+		plt.xlim(xmin=1)
+	
+	plt.ylabel('number of posts')
+	plt.xlabel('number of %s' % type)
+	plt.title('Distribution of %s in %s' % (type, COLLECTION_NAME))
+		
+	if show : plt.show()
+	
+	return data
 
 def completion_matrix(show=True):
 	#Get the time points to be used
@@ -76,7 +111,7 @@ def topTrajectories(type='line'):
 	#######################
 	
 	c = 1
-	ranks = maxRankAchieved(False)
+	ranks = distro('pos',show=False)
 	for i in r:
 		plt.subplot(rows*100 + columns*10 + c)
 		c += 1
