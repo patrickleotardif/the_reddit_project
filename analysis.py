@@ -7,7 +7,8 @@ from pymongo import Connection
 connection = Connection()
 db = connection.reddit
 
-collection = db.travel
+collection = db.fitness
+START_TIME = 1352955347
 #TRAVEL = 1352938569
 #FITNESS = 1352955347
 #####################
@@ -85,7 +86,7 @@ def topTrajectories(type='line'):
 		elif type == 'box':
 			topTrajectoriesPerGroup(ranks[i],False)
 
-		plt.title('Max Rank = %s' % i)
+		plt.title('Max Rank = %s (n= %s)' % (i,len(ranks[i])))
 		plt.ylim((1,20))
 		plt.xlim((0,50))
 	plt.show()
