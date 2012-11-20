@@ -1,14 +1,15 @@
 import pymongo
+from itertools import *
 import matplotlib.pyplot as plt
-
+from numpy import *
 
 #####################
 from pymongo import Connection
 connection = Connection()
 db = connection.reddit
 
-COLLECTION_NAME = 'fitness'
-collection = db.fitness
+COLLECTION_NAME = 'travel'
+collection = db.travel
 START_TIME = 0
 #TRAVEL = 1352938569
 #FITNESS = 1352955347
@@ -17,7 +18,32 @@ START_TIME = 0
 parms = {'created_utc':{'$gte' : START_TIME}}
 parms2 = {'created_utc':START_TIME}
 
+def upDownMatrix():
+	ups = []
+	downs =  [] 
+	for doc in collection.find(parms):
+		subparms  = {'_id':doc['_id']}
+		up = 0
+		down = 0
+		for item in collection.find_one(subparms)['var']:
+			if item['data'] != '?' : 
+				up = max(up,item['data']['up'])
+				down = max(down,item['data']['down']+1)
+		if up+down != 0:
+			ups.append(up)
+			downs.append(down)
+	
+	xmin = min(log(ups))
+	xmax = max(log(ups))
+	ymin = min(log(downs))
+	ymax = max(log(downs))
+	
+	plt.hexbin(log(ups),log(downs), bins='log', cmap=plt.cm.YlOrRd_r)
+	plt.axis([xmin, xmax, ymin, ymax])
+	
+	plt.show()
 
+			
 def distroReport():
 	c = 1	
 	for type in (('pos',None),('com',None),('up','loglog'),('down','loglog')):
@@ -25,8 +51,7 @@ def distroReport():
 		distro(type[0],type[1],False)
 		c += 1
 	plt.show()
-	
-	
+		
 #options for type = up/down/com/pos
 def distro(type,plot=None,show=True):	
 	data = {}
