@@ -10,7 +10,7 @@ db = connection.reddit
 
 COLLECTION_NAME = 'travel'
 collection = db.travel
-START_TIME = 0
+START_TIME = 1352938569
 #TRAVEL = 1352938569
 #FITNESS = 1352955347
 #####################
@@ -21,25 +21,34 @@ parms2 = {'created_utc':START_TIME}
 def upDownMatrix():
 	ups = []
 	downs =  [] 
+	poss = []
 	for doc in collection.find(parms):
 		subparms  = {'_id':doc['_id']}
 		up = 0
 		down = 0
+		pos = 5000
 		for item in collection.find_one(subparms)['var']:
 			if item['data'] != '?' : 
 				up = max(up,item['data']['up'])
-				down = max(down,item['data']['down']+1)
+				down = max(down,item['data']['down']+1) #to make log stuff work
+				pos = min(pos,item['data']['pos'])
 		if up+down != 0:
 			ups.append(up)
 			downs.append(down)
+			poss.append(min(pos,10))
+			
 	
 	xmin = min(log(ups))
 	xmax = max(log(ups))
 	ymin = min(log(downs))
 	ymax = max(log(downs))
+	#poss = log(poss)
 	
-	plt.hexbin(log(ups),log(downs), bins='log', cmap=plt.cm.YlOrRd_r)
+	#plt.hexbin(log(ups),log(downs), bins='log', cmap=plt.cm.YlOrRd_r)
+	plt.scatter(log(ups),log(downs),c=poss,s=100)
 	plt.axis([xmin, xmax, ymin, ymax])
+	plt.gray()
+	plt.colorbar()
 	
 	plt.show()
 
