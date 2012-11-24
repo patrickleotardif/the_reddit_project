@@ -20,7 +20,36 @@ START_TIME = 1352955347
 parms = {'created_utc':{'$gte' : START_TIME}}
 parms2 = {'created_utc':START_TIME}
 
-def trajectoryReports():
+
+def advancedTrajectoryReport():
+	intervals = [
+		[1,5,'blue'],
+		[6,10,'blue'],
+		[11,15,'blue'],
+		[16,1000,'blue']
+	]
+	
+	c = 1
+	for i in intervals:	
+		plt.subplot(220 + c)
+		c += 1
+		n = advancedTrajectories(i[0],i[1],i[2])
+		plt.title('Max Rank %s-%s (n = %s)' % (i[0],i[1],n))
+	plt.suptitle('Normalized rises for %s' % COLLECTION_NAME)
+	plt.show()
+	
+def advancedTrajectories(maxRank,minRank,color):
+	counter = 0
+	for doc in collection.find(parms):
+		tr = trajectory(doc['_id'],False,False)
+		if len(tr) >= 10 and max(tr) != min(tr): 
+			min_val = min(tr)
+			if min_val >= maxRank and min_val <= minRank:
+				trajectoryPlotNormalized(tr,color)
+				counter += 1
+	return counter
+
+def basicTrajectoryReports():
 	intervals = [
 		(1,5),
 		(6,10),
@@ -37,7 +66,7 @@ def trajectoryReportBasic(maxRank,minRank):
 	for doc in collection.find(parms):
 		tr = trajectory(doc['_id'],False,False)
 		if len(tr) >= 3: 
-			data = trajectoryNormalize(tr)
+			data = trajectoryNormalizeTime(tr)
 			min_val = min(tr)
 			if min_val >= maxRank and min_val <= minRank:
 				rises.append(data['rise']+1)
@@ -62,9 +91,22 @@ def trajectoryReportBasic(maxRank,minRank):
 	plt.title('Plateau length')
 	plt.suptitle('Peaks from %s-%s (n=%s) in %s' % (maxRank, minRank, len(rises), COLLECTION_NAME))
 	lab.savefig("%s-%s (%s).png" % (maxRank, minRank, COLLECTION_NAME))
-	
 
-def trajectoryNormalize(tr):
+def trajectoryPlotNormalized(tr,c='black'):
+	plt.plot(trajectoryNormalizeTime(tr)['t'],trajectoryNormalizeRank(tr),color=c,alpha=0.2)
+	plt.gca().set_xlim([-1,0])
+	
+def trajectoryNormalizeRank(tr):
+	min_value = min(tr)
+	max_value = max(tr)
+	new_tr = []
+	if max_value == min_value:
+		for i in tr: new_tr.append(0.5)
+	else:
+		for i in tr: new_tr.append((max_value - i)/float(max_value - min_value))
+	return new_tr
+
+def trajectoryNormalizeTime(tr):
 	#indices
 	min_value = min(tr)
 	min_index = 1000
@@ -274,5 +316,5 @@ def trajectory(id,show=True,plot=True):
 	return pos
 
 if __name__ == '__main__':
-    trajectoryReports()		
+    basicTrajectoryReports()		
 		
