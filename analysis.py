@@ -9,7 +9,7 @@ connection = Connection()
 db = connection.reddit
 
 COLLECTION_NAME = 'travel'
-collection = db.travel
+collection = db.subreddits
 START_TIME = 1352938569
 #TRAVEL = 1352938569
 #FITNESS = 1352955347
@@ -17,6 +17,18 @@ START_TIME = 1352938569
 
 parms = {'created_utc':{'$gte' : START_TIME}}
 parms2 = {'created_utc':START_TIME}
+
+def subredditDistro():
+	data = []
+	for sub in collection.find():
+		data.append(log(sub['data']['subscribers']+1)) #avoid zero errors
+	plt.hist(data,log=True,histtype='step')
+	plt.title('Subreddit log(size) vs. log(frequency)')
+	plt.xlabel('Log(size)')
+	plt.ylabel('Frequency')
+	plt.show()
+
+		
 
 def upDownMatrix():
 	ups = []
