@@ -1,22 +1,93 @@
 import pymongo
 from itertools import *
 import matplotlib.pyplot as plt
+import matplotlib
 from numpy import *
+import pylab as lab
 
 #####################
 from pymongo import Connection
 connection = Connection()
 db = connection.reddit
 
-COLLECTION_NAME = 'travel'
-collection = db.subreddits
-START_TIME = 1352938569
+COLLECTION_NAME = 'fitness'
+collection = db.fitness
+START_TIME = 1352955347
 #TRAVEL = 1352938569
 #FITNESS = 1352955347
 #####################
 
 parms = {'created_utc':{'$gte' : START_TIME}}
 parms2 = {'created_utc':START_TIME}
+
+def trajectoryReports():
+	intervals = [
+		(1,5),
+		(6,10),
+		(11,15),
+		(16,25),
+		(26,1000)
+	]	
+	for i in intervals:	trajectoryReportBasic(i[0],i[1])
+		
+def trajectoryReportBasic(maxRank,minRank):
+	rises = []
+	falls = []
+	plats = []
+	for doc in collection.find(parms):
+		tr = trajectory(doc['_id'],False,False)
+		if len(tr) >= 3: 
+			data = trajectoryNormalize(tr)
+			min_val = min(tr)
+			if min_val >= maxRank and min_val <= minRank:
+				rises.append(data['rise']+1)
+				falls.append(data['fall']+1)
+				plats.append(data['plat'])
+				
+	rises = log(rises)
+	falls = log(falls)
+	plt.figure(figsize=(12,8))
+	plt.subplot2grid((3,2),(0,0))
+	plt.hist(rises)
+	plt.title('log(rise)')
+	plt.subplot2grid((3,2),(1,0))
+	plt.hist(falls)
+	plt.title('log(fall)')
+	plt.subplot2grid((3,2),(0,1),rowspan=2)
+	plt.hist2d(rises,falls)
+	plt.xlabel('log(rise)')
+	plt.ylabel('log(fall)')
+	plt.subplot2grid((3,2),(2,0),colspan=2)
+	plt.hist(plats,log=True)
+	plt.title('Plateau length')
+	plt.suptitle('Peaks from %s-%s (n=%s) in %s' % (maxRank, minRank, len(rises), COLLECTION_NAME))
+	lab.savefig("%s-%s (%s).png" % (maxRank, minRank, COLLECTION_NAME))
+	
+
+def trajectoryNormalize(tr):
+	#indices
+	min_value = min(tr)
+	min_index = 1000
+	max_index = None
+	for i in range(0,len(tr)): 
+		if tr[i] == min_value: 
+			max_index = max(i,max_index)
+			min_index = min(i,min_index)
+	times = []
+	for i in range(0,len(tr)): 
+		if i < max_index:
+			value = -1 + i*(1/float(max_index))
+		elif i == max_index:
+			value = 0
+		else:
+			value = ((i-max_index)*1)/float(len(tr)-max_index-1)
+		times.append(value)
+	#plt.plot(times,tr)
+	#plt.show()
+	return {'t':times,'rise': min_index, 'fall': len(tr) - max_index, 'plat': max_index - min_index}
+	
+def getCollection():
+	return collection
 
 def subredditDistro():
 	data = []
@@ -27,8 +98,6 @@ def subredditDistro():
 	plt.xlabel('Log(size)')
 	plt.ylabel('Frequency')
 	plt.show()
-
-		
 
 def upDownMatrix():
 	ups = []
@@ -189,16 +258,21 @@ def topTrajectoriesPerGroup(ids,show=True):
 	if show:	plt.show()
 	return data
 	
-def trajectory(id,show=True):
+def trajectory(id,show=True,plot=True):
 	query = {'_id':id}
 	pos = []
 	for item in collection.find_one(query)['var']:
-		if item['data'] != '?' : pos.append(item['data']['pos'])
+		if item['data'] != '?' : 
+			if item['data']['pos'] < 900:
+				pos.append(item['data']['pos'])
 	
-	plt.plot(pos)
-	plt.ylim((1,100))
-	plt.xlim((0,50))
-	if show: plt.show()
+	if plot:
+		plt.plot(pos)
+		plt.ylim((1,100))
+		plt.xlim((0,50))
+		if show: plt.show()
 	return pos
-				
+
+if __name__ == '__main__':
+    trajectoryReports()		
 		
