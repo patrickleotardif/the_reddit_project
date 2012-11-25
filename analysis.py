@@ -10,11 +10,16 @@ from pymongo import Connection
 connection = Connection()
 db = connection.reddit
 
-COLLECTION_NAME = 'fitness'
-collection = db.fitness
-START_TIME = 1352955347
-#TRAVEL = 1352938569
-#FITNESS = 1352955347
+SUBREDDIT = 'fitness'
+
+if SUBREDDIT == 'travel':
+	COLLECTION_NAME = 'travel'
+	collection = db.travel
+	START_TIME = 1352938569
+elif SUBREDDIT == 'fitness':
+	COLLECTION_NAME = 'fitness'
+	collection = db.fitness
+	START_TIME = 1352955347
 #####################
 
 parms = {'created_utc':{'$gte' : START_TIME}}
@@ -28,24 +33,25 @@ def advancedTrajectoryReport():
 		[11,15,'blue'],
 		[16,1000,'blue']
 	]
+	for type in ['rise','plateau','fall']:	
+		c = 1
+		plt.figure(figsize=(8,8))
+		for i in intervals:				
+			plt.subplot(220 + c)
+			c += 1
+			n = advancedTrajectories(i[0],i[1],i[2],type)
+			plt.title('Max Rank %s-%s (n = %s)' % (i[0],i[1],n))
+		plt.suptitle('Normalized %s for %s' % (type,COLLECTION_NAME))
+		plt.savefig('Normalized %s for %s.png' % (type,COLLECTION_NAME))
 	
-	c = 1
-	for i in intervals:	
-		plt.subplot(220 + c)
-		c += 1
-		n = advancedTrajectories(i[0],i[1],i[2])
-		plt.title('Max Rank %s-%s (n = %s)' % (i[0],i[1],n))
-	plt.suptitle('Normalized rises for %s' % COLLECTION_NAME)
-	plt.show()
-	
-def advancedTrajectories(maxRank,minRank,color):
+def advancedTrajectories(maxRank,minRank,color,type):
 	counter = 0
 	for doc in collection.find(parms):
 		tr = trajectory(doc['_id'],False,False)
 		if len(tr) >= 10 and max(tr) != min(tr): 
 			min_val = min(tr)
 			if min_val >= maxRank and min_val <= minRank:
-				trajectoryPlotNormalized(tr,color)
+				trajectoryPlotNormalized(tr,type,color)
 				counter += 1
 	return counter
 
@@ -54,8 +60,7 @@ def basicTrajectoryReports():
 		(1,5),
 		(6,10),
 		(11,15),
-		(16,25),
-		(26,1000)
+		(16,1000)
 	]	
 	for i in intervals:	trajectoryReportBasic(i[0],i[1])
 		
@@ -71,30 +76,53 @@ def trajectoryReportBasic(maxRank,minRank):
 			if min_val >= maxRank and min_val <= minRank:
 				rises.append(data['rise']+1)
 				falls.append(data['fall']+1)
-				plats.append(data['plat'])
+				plats.append(data['plat']+1)
 				
 	rises = log(rises)
 	falls = log(falls)
-	plt.figure(figsize=(12,8))
-	plt.subplot2grid((3,2),(0,0))
+	plats = log(plats)
+	
+	plt.figure(figsize=(15,8))
+	
+	plt.subplot(231)
 	plt.hist(rises)
 	plt.title('log(rise)')
-	plt.subplot2grid((3,2),(1,0))
+	
+	plt.subplot(232)
 	plt.hist(falls)
 	plt.title('log(fall)')
-	plt.subplot2grid((3,2),(0,1),rowspan=2)
+	
+	plt.subplot(233)
+	plt.hist(plats)
+	plt.title('log(plat)')
+	
+	plt.subplot(234)
 	plt.hist2d(rises,falls)
 	plt.xlabel('log(rise)')
 	plt.ylabel('log(fall)')
-	plt.subplot2grid((3,2),(2,0),colspan=2)
-	plt.hist(plats,log=True)
-	plt.title('Plateau length')
+	
+	plt.subplot(235)
+	plt.hist2d(falls,plats)
+	plt.xlabel('log(fall)')
+	plt.ylabel('log(plat)')
+	
+	plt.subplot(236)
+	plt.hist2d(rises,plats)
+	plt.xlabel('log(rise)')
+	plt.ylabel('log(plat)')
+	
+
 	plt.suptitle('Peaks from %s-%s (n=%s) in %s' % (maxRank, minRank, len(rises), COLLECTION_NAME))
 	lab.savefig("%s-%s (%s).png" % (maxRank, minRank, COLLECTION_NAME))
 
-def trajectoryPlotNormalized(tr,c='black'):
-	plt.plot(trajectoryNormalizeTime(tr)['t'],trajectoryNormalizeRank(tr),color=c,alpha=0.2)
-	plt.gca().set_xlim([-1,0])
+def trajectoryPlotNormalized(tr,type=None, c='blue'):
+	x_values = trajectoryNormalizeRank(tr)
+	x_values = map(lambda x: pow(x,5),x_values)
+	plt.plot(trajectoryNormalizeTime(tr)['t'],x_values,color=c,alpha=0.2)
+	if type == 'rise': plt.gca().set_xlim([0,1])		
+	elif type == 'plateau': plt.gca().set_xlim([1,2])
+	elif type == 'fall': plt.gca().set_xlim([2,3])
+
 	
 def trajectoryNormalizeRank(tr):
 	min_value = min(tr)
@@ -117,15 +145,18 @@ def trajectoryNormalizeTime(tr):
 			min_index = min(i,min_index)
 	times = []
 	for i in range(0,len(tr)): 
-		if i < max_index:
-			value = -1 + i*(1/float(max_index))
+		if i < min_index:
+			value = 0 + i*(1/float(min_index))
+		elif i == min_index:
+			value = 1
+		elif i > min_index and i < max_index:
+			value = 1 + (i-min_index)*(1/float(max_index-min_index))
 		elif i == max_index:
-			value = 0
+			value = 2
 		else:
-			value = ((i-max_index)*1)/float(len(tr)-max_index-1)
+			value = 2 + (i-max_index)*(1/float(len(tr) - 1 - max_index))
 		times.append(value)
-	#plt.plot(times,tr)
-	#plt.show()
+
 	return {'t':times,'rise': min_index, 'fall': len(tr) - max_index, 'plat': max_index - min_index}
 	
 def getCollection():
@@ -216,7 +247,7 @@ def distro(type,plot=None,show=True):
 		plt.loglog(map(lambda x: len(data[x]),data))
 	
 	if type in ('up','pos'):
-		plt.xlim(xmin=1)
+		plt.gca().set_xlim(left=1)
 	
 	plt.ylabel('number of posts')
 	plt.xlabel('number of %s' % type)
@@ -314,7 +345,7 @@ def trajectory(id,show=True,plot=True):
 		plt.xlim((0,50))
 		if show: plt.show()
 	return pos
-
+	
 if __name__ == '__main__':
     basicTrajectoryReports()		
 		
