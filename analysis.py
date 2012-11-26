@@ -10,7 +10,7 @@ from pymongo import Connection
 connection = Connection()
 db = connection.reddit
 
-SUBREDDIT = 'fitness'
+SUBREDDIT = 'frontpage'
 
 if SUBREDDIT == 'travel':
 	COLLECTION_NAME = 'travel'
@@ -20,47 +20,144 @@ elif SUBREDDIT == 'fitness':
 	COLLECTION_NAME = 'fitness'
 	collection = db.fitness
 	START_TIME = 1352955347
+elif SUBREDDIT == 'worldnews':
+	COLLECTION_NAME = 'worldnews'
+	collection = db.worldnews
+	START_TIME = 0
+elif SUBREDDIT == 'pics':
+	COLLECTION_NAME = 'pics'
+	collection = db.pics
+	START_TIME = 0
+elif SUBREDDIT == 'frontpage':
+	COLLECTION_NAME = 'frontpage'
+	collection = db.frontpage
+	START_TIME = 0
 #####################
 
 parms = {'created_utc':{'$gte' : START_TIME}}
 parms2 = {'created_utc':START_TIME}
 
-
-def advancedTrajectoryReport():
-	intervals = [
-		[1,5,'blue'],
-		[6,10,'blue'],
-		[11,15,'blue'],
-		[16,1000,'blue']
-	]
-	for type in ['rise','plateau','fall']:	
+def chunks():
+	kincr = []
+	pincr = []
+	for doc in collection.find(parms):
+		ktr = trajectory(doc['_id'],False,False,'karma')
+		tr = trajectory(doc['_id'],False,False)
+		for i in range(1,len(tr)):
+			kincr.append(ktr[i] - ktr[i-1])
+			pincr.append(tr[i] - tr[i-1])
+	
+	#log scaler
+	nkincr = []
+	for k in kincr:
+		if k < 0: nkincr.append(-log(-k+1))
+		elif k == 0: nkincr.append(0)
+		elif k > 0 : nkincr.append(log(k+1))
+	npincr = []
+	for p in pincr:
+		if p < 0: npincr.append(-log(-p+1))
+		elif p == 0: npincr.append(0)
+		elif p > 0 : npincr.append(log(p+1))
+	plt.hexbin(npincr,nkincr,bins='log',mincnt=1)
+	plt.colorbar()
+	plt.title('Trajectory movement')
+	plt.xlabel('log scaled change of position')
+	plt.ylabel('log scaled change of karma')
+	plt.show()
+	#return (npincr,nkincr)
+		
+def cdfmod():
+	pos = distro('pos',dataOnly=True)
+	cpos = []
+	for i in range(1,max(pos.keys())):
+		val = 0
+		for p in pos:
+			if p <= i:
+				val += len(pos[p])
+		cpos.append(val)
+	first = cpos[0]
+	cpos = map(lambda x: first/float(x),cpos)
+	return cpos
+				
+def karmaRank():
+	karmas= []
+	poss = []
+	for doc in collection.find(parms):
+		subparms  = {'_id':doc['_id']}
+		karma = 0
+		pos = 5000
+		if 'var' in collection.find_one(subparms).keys():
+			for item in collection.find_one(subparms)['var']:
+				if item['data'] != '?' : 
+					karma = max(karma,item['data']['up']-item['data']['down'])
+					pos = min(pos,item['data']['pos'])
+		if karma != 0 and pos != 5000:
+			karmas.append(max(karma,1))
+			poss.append(pos)
+	plt.hexbin(log(poss),log(karmas),bins='log',mincnt=1)
+	plt.title('Log(minimum position achieved) vs. Log(max karma achieved)')
+	plt.xlabel('Position')
+	plt.ylabel('Karma')
+	plt.colorbar()
+	plt.show()
+	#return (karmas,poss)
+				
+def advancedTrajectoryReport(karma=False):
+	if karma:
+		intervals = [
+			[1,25,'blue'],
+			[26,100,'blue'],
+			[100,500,'blue'],	
+			[500,1000,'blue'],
+			[1000,2000,'blue'],
+			[2000,10000,'blue'],
+		]
+	else:
+		intervals = [
+			[1,100,'blue'],
+			[100,200,'blue'],
+			[200,300,'blue'],	
+			[300,500,'blue'],
+			[500,1000,'blue']
+		]
+	for type in ['rise','fall']:	#['rise','plateau','fall']
 		c = 1
-		plt.figure(figsize=(8,8))
+		plt.figure(figsize=(15,8))
 		for i in intervals:				
-			plt.subplot(220 + c)
+			plt.subplot(230 + c)
 			c += 1
-			n = advancedTrajectories(i[0],i[1],i[2],type)
+			n = advancedTrajectories(i[0],i[1],i[2],type,karma)
 			plt.title('Max Rank %s-%s (n = %s)' % (i[0],i[1],n))
 		plt.suptitle('Normalized %s for %s' % (type,COLLECTION_NAME))
 		plt.savefig('Normalized %s for %s.png' % (type,COLLECTION_NAME))
 	
-def advancedTrajectories(maxRank,minRank,color,type):
+def advancedTrajectories(maxRank,minRank,color,type,karma=False):
 	counter = 0
 	for doc in collection.find(parms):
-		tr = trajectory(doc['_id'],False,False)
+		if karma:
+			tr = trajectory(doc['_id'],False,False,'karma')
+		else:
+			tr = trajectory(doc['_id'],False,False)
 		if len(tr) >= 10 and max(tr) != min(tr): 
-			min_val = min(tr)
+			if karma:
+				min_val = max(tr)
+			else:
+				min_val = min(tr)
 			if min_val >= maxRank and min_val <= minRank:
-				trajectoryPlotNormalized(tr,type,color)
+				if karma:
+					trajectoryPlotNormalized(tr,type,color,True)
+				else:
+					trajectoryPlotNormalized(tr,type,color)
 				counter += 1
 	return counter
 
 def basicTrajectoryReports():
 	intervals = [
-		(1,5),
-		(6,10),
-		(11,15),
-		(16,1000)
+		(1,100),
+		(100,200),
+		(200,300),
+		(300,500),
+		(500,1000)
 	]	
 	for i in intervals:	trajectoryReportBasic(i[0],i[1])
 		
@@ -115,28 +212,39 @@ def trajectoryReportBasic(maxRank,minRank):
 	plt.suptitle('Peaks from %s-%s (n=%s) in %s' % (maxRank, minRank, len(rises), COLLECTION_NAME))
 	lab.savefig("%s-%s (%s).png" % (maxRank, minRank, COLLECTION_NAME))
 
-def trajectoryPlotNormalized(tr,type=None, c='blue'):
-	x_values = trajectoryNormalizeRank(tr)
+def trajectoryPlotNormalized(tr,type=None, c='blue',karma=False):
+	if karma:
+		x_values = trajectoryNormalizeRank(tr,True)
+	else:
+		x_values = trajectoryNormalizeRank(tr)
 	x_values = map(lambda x: pow(x,5),x_values)
-	plt.plot(trajectoryNormalizeTime(tr)['t'],x_values,color=c,alpha=0.2)
+	plt.plot(trajectoryNormalizeTime(tr,karma)['t'],x_values,color=c,alpha=0.05)
 	if type == 'rise': plt.gca().set_xlim([0,1])		
 	elif type == 'plateau': plt.gca().set_xlim([1,2])
 	elif type == 'fall': plt.gca().set_xlim([2,3])
 
 	
-def trajectoryNormalizeRank(tr):
+def trajectoryNormalizeRank(tr,karma=False):
 	min_value = min(tr)
 	max_value = max(tr)
 	new_tr = []
 	if max_value == min_value:
 		for i in tr: new_tr.append(0.5)
 	else:
-		for i in tr: new_tr.append((max_value - i)/float(max_value - min_value))
+		for i in tr: 
+			if karma:
+				new_tr.append(1-((max_value - i)/float(max_value - min_value)))
+			else:
+				new_tr.append((max_value - i)/float(max_value - min_value))
+
 	return new_tr
 
-def trajectoryNormalizeTime(tr):
+def trajectoryNormalizeTime(tr,karma=False):
 	#indices
-	min_value = min(tr)
+	if karma:
+		min_value = max(tr)
+	else:
+		min_value = min(tr)
 	min_index = 1000
 	max_index = None
 	for i in range(0,len(tr)): 
@@ -209,14 +317,14 @@ def upDownMatrix():
 			
 def distroReport():
 	c = 1	
-	for type in (('pos',None),('com',None),('up','loglog'),('down','loglog')):
+	for type in (('pos',None),('com','loglog'),('up','loglog'),('down','loglog')):
 		plt.subplot(220 + c)
 		distro(type[0],type[1],False)
 		c += 1
 	plt.show()
 		
 #options for type = up/down/com/pos
-def distro(type,plot=None,show=True):	
+def distro(type,plot=None,show=True,dataOnly=False):	
 	data = {}
 	
 	if type in ('up','down','com'):
@@ -229,31 +337,33 @@ def distro(type,plot=None,show=True):
 	for doc in collection.find(parms):
 		subparms  = {'_id':doc['_id']}
 		s = INITIAL
-		for item in collection.find_one(subparms)['var']:
-			if item['data'] != '?' : 
-				if FUNC == 'max':
-					s = max(s,item['data'][type])
-				else : #min or pos
-					s = min(s,item['data'][type])
+		if 'var' in collection.find_one(subparms).keys():
+			for item in collection.find_one(subparms)['var']:
+				if item['data'] != '?' : 
+					if FUNC == 'max':
+						s = max(s,item['data'][type])
+					else : #min or pos
+						s = min(s,item['data'][type])
 		if s != INITIAL:
 			if s in data:
 				data[s].append(doc['_id'])
 			else:
 				data[s] = [doc['_id']]
 	
-	if not plot:
-		plt.plot(map(lambda x: len(data[x]),data))
-	elif plot == 'loglog':
-		plt.loglog(map(lambda x: len(data[x]),data))
+	if not dataOnly:
+		if not plot:
+			plt.plot(map(lambda x: len(data[x]),data))
+		elif plot == 'loglog':
+			plt.loglog(map(lambda x: len(data[x]),data))
 	
-	if type in ('up','pos'):
-		plt.gca().set_xlim(left=1)
+		if type in ('up','pos'):
+			plt.gca().set_xlim(left=1)
 	
-	plt.ylabel('number of posts')
-	plt.xlabel('number of %s' % type)
-	plt.title('Distribution of %s in %s' % (type, COLLECTION_NAME))
+		plt.ylabel('number of posts')
+		plt.xlabel('number of %s' % type)
+		plt.title('Distribution of %s in %s' % (type, COLLECTION_NAME))
 		
-	if show : plt.show()
+		if show : plt.show()
 	
 	return data
 
@@ -330,15 +440,18 @@ def topTrajectoriesPerGroup(ids,show=True):
 	plt.boxplot(data)
 	if show:	plt.show()
 	return data
-	
-def trajectory(id,show=True,plot=True):
+
+def trajectory(id,show=True,plot=True,type='pos'):
 	query = {'_id':id}
 	pos = []
-	for item in collection.find_one(query)['var']:
-		if item['data'] != '?' : 
-			if item['data']['pos'] < 900:
-				pos.append(item['data']['pos'])
-	
+	if 'var' in collection.find_one(query).keys():
+		for item in collection.find_one(query)['var']:
+			if item['data'] != '?' : 
+				if item['data']['pos'] < 900:
+					if type =='pos':
+						pos.append(item['data']['pos'])
+					elif type == 'karma':
+						pos.append(item['data']['up']-item['data']['down'])
 	if plot:
 		plt.plot(pos)
 		plt.ylim((1,100))
