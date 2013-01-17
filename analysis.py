@@ -37,6 +37,23 @@ elif SUBREDDIT == 'frontpage':
 parms = {'created_utc':{'$gte' : START_TIME}}
 parms2 = {'created_utc':START_TIME}
 
+
+def word_freq_distro(word_map):
+	pts = []
+	for word in word_map.most_common():
+		pts.append(word[1])
+	return pts
+
+def title_length(good):
+	points_ranks = []
+	points_lengths = []
+	for id in good:
+		points_ranks.append( min(trajectory(id,False,False,'pos')) )
+		points_lengths.append( len(collection.find_one(id)['title'])  )
+	plt.scatter(points_ranks,points_lengths)
+	plt.show()
+	return {'ranks':points_ranks,'lengths':points_lengths }
+
 def chunks():
 	kincr = []
 	pincr = []
